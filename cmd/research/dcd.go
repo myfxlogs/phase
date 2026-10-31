@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -162,8 +163,12 @@ func researchArms(ctx context.Context, errc chan<- error, pool *pgxpool.Pool,
 		return get429(ctx, okcli, "/api/v5/market/tickers?instType=SPOT")
 	})
 	go fr.Run(ctx, errc)
-	go dcd.NewRunner(pool, cfg).AttachFeed(dcdFeedFor(okcli, rej)).
-		AttachCoins(okxCoinsFor(pool, okcli)).AttachAlerter(alerter).Run(ctx, errc)
+	if en, err := cfg.GetBool("research.dcd.enabled"); err == nil && !en {
+		log.Printf("[o-research] dcd 枚举臂退役（research.dcd.enabled=false——D-0037 退场）")
+	} else {
+		go dcd.NewRunner(pool, cfg).AttachFeed(dcdFeedFor(okcli, rej)).
+			AttachCoins(okxCoinsFor(pool, okcli)).AttachAlerter(alerter).Run(ctx, errc)
+	}
 	go gapscan.NewRunner(pool, cfg).AttachProbe(gapProbeFor(okcli)).AttachAlerter(alerter).Run(ctx, errc)
 	hr := hypothesis.NewRunner(pool, cfg)
 	hr.AttachAlerter(alerter)
